@@ -33,7 +33,7 @@ public class ConnectionPool {
         scheduledExecutorService.scheduleAtFixedRate(runnable,1,1, TimeUnit.SECONDS);
     }
 
-    //检查数据库连接池中的连接是否达到最小连接数
+    //检查数据库连接池中的空闲连接是否达到最小空闲连接数
     private void checkPool(){
         if(count<poolConfig.getMaxPoolSize())
         {
@@ -43,6 +43,10 @@ public class ConnectionPool {
                     freeConnection.add(getNewConnetion());
                     System.out.println("创建一条新连接用来补充连接池");
                     count++;
+                    if(count==poolConfig.getMaxPoolSize())
+                    {
+                        break;
+                    }
                 } catch (SQLException e) {
                     e.printStackTrace();
                 }
@@ -62,7 +66,7 @@ public class ConnectionPool {
     }
 
     //初始化数据库连接池
-    public void init(){
+    private void init(){
         for (int i=0;i<poolConfig.getInitialPoolSize();i++){
             Connection connection;
             try {
@@ -198,6 +202,18 @@ public class ConnectionPool {
         }
         else {
             System.out.println(thread.getName()+"的连接已经回收过了，不必重新回收");
+        }
+    }
+
+    private void checkInUse()
+    {
+        for(Connection connection:useConnection)
+        {
+            if(!isEnable(connection))
+            {
+                useConnection.remove(connection);
+                count--;
+            }
         }
     }
 }

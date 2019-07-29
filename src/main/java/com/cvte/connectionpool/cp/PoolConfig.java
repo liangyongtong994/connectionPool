@@ -11,12 +11,12 @@ public class PoolConfig {
     private String userName;
     //密码
     private String password;
-    //最小连接数
+    //最小空闲连接数
     private int minPoolSize=2;
     //初始化连接数
     private int initialPoolSize=3;
     //最大连接数
-    private int maxPoolSize=10;
+    private int maxPoolSize=7;
     //最大等待时间
     private int maxWaitTime=2000;
 

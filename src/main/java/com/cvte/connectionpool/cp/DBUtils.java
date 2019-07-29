@@ -56,6 +56,20 @@ public class DBUtils {
         }
         return connectionPool;
     }
+
+    public static Connection getConnection(){
+        try {
+            return connectionPool.getConnection();
+        } catch (InterruptedException e) {
+            e.printStackTrace();
+        }
+        return null;
+    }
+
+    public static void destroyPool()
+    {
+        connectionPool.destroy();
+    }
    /*private static ConnectionPool connectionPool=null;
    public static ConnectionPool getConnectionPoolInstance(){
        if(connectionPool==null){

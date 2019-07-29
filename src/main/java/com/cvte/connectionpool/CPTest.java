@@ -13,24 +13,6 @@ public class CPTest {
     public static void main(String[] args){
 
         ConnectionPool connectionPool= DBUtils.getConnectionPoolInstance();
-        /*try {
-            ConnectionPool connectionPool= DBUtils.getConnectionPoolInstance();
-            String sql="select * from task";
-            Connection connection=connectionPool.getConnection();
-            Statement statement=connection.createStatement();
-            ResultSet resultSet=statement.executeQuery(sql);
-            while (resultSet.next()){
-                String taskname=resultSet.getNString("task_name");
-                System.out.println("taskname:"+taskname);
-            }
-            resultSet.close();
-            statement.close();
-            connectionPool.releaseConnection(connection);
-        } catch (InterruptedException e) {
-            e.printStackTrace();
-        } catch (SQLException e) {
-            e.printStackTrace();
-        }*/
         RunTest runTest1=new RunTest("Thread-1");
         runTest1.start();
         RunTest2 runTest21=new RunTest2("wrong-thread");
@@ -61,10 +43,11 @@ class RunTest implements Runnable{
     }
     @Override
     public void run() {
+        ConnectionPool connectionPool= DBUtils.getConnectionPoolInstance();
+        String sql="select * from task";
+        Connection connection=null;
         try {
-            ConnectionPool connectionPool= DBUtils.getConnectionPoolInstance();
-            String sql="select * from task";
-            Connection connection=connectionPool.getConnection();
+            connection=connectionPool.getConnection();
             Statement statement=connection.createStatement();
             ResultSet resultSet=statement.executeQuery(sql);
             while (resultSet.next()){
@@ -100,19 +83,30 @@ class RunTest2 implements Runnable{
     }
     @Override
     public void run() {
+        ConnectionPool connectionPool= DBUtils.getConnectionPoolInstance();
+        Connection connection=null;
         try {
-            ConnectionPool connectionPool= DBUtils.getConnectionPoolInstance();
-            String sql="select * from task";
-            Connection connection=connectionPool.getConnection();
-            Connection connection1=connectionPool.getConnection();
-            connection1.close();
-            connection.close();
 
-            //throw new SQLException("连接失败");
+            String sql="select * from task";
+            connection=connectionPool.getConnection();
+            //Connection connection1=connectionPool.getConnection();
+            throw new SQLException("连接失败");
+            //connection1.close();
+            //connection.close();
+
+
         } catch (InterruptedException e) {
             e.printStackTrace();
         } catch (SQLException e) {
             e.printStackTrace();
+        }finally {
+            if(connection!=null) {
+                try {
+                    connection.close();
+                } catch (SQLException e) {
+                    e.printStackTrace();
+                }
+            }
         }
     }
 
