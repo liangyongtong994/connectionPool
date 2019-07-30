@@ -3,6 +3,7 @@ package com.cvte.connectionpool.cp;
 import java.sql.Connection;
 import java.sql.DriverManager;
 import java.sql.SQLException;
+import java.util.LinkedList;
 import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
@@ -14,8 +15,8 @@ public class ConnectionPool {
 
     private PoolConfig poolConfig;
     private int count;
-    private CopyOnWriteArrayList<Connection> freeConnection = new CopyOnWriteArrayList<>();
-    private CopyOnWriteArrayList<Connection> useConnection = new CopyOnWriteArrayList<>();
+    private LinkedList<Connection> freeConnection = new LinkedList<>();
+    private LinkedList<Connection> useConnection = new LinkedList<>();
     private static ThreadLocal<Connection> threadLocal = new ThreadLocal<>();
     private ScheduledExecutorService scheduledExecutorService;
 
@@ -30,11 +31,11 @@ public class ConnectionPool {
             }
         };
         scheduledExecutorService= Executors.newSingleThreadScheduledExecutor();
-        scheduledExecutorService.scheduleAtFixedRate(runnable,1,1, TimeUnit.SECONDS);
+        scheduledExecutorService.scheduleAtFixedRate(runnable,poolConfig.getCheckTime(),poolConfig.getCheckTime(), TimeUnit.SECONDS);
     }
 
     //检查数据库连接池中的空闲连接是否达到最小空闲连接数
-    private void checkPool(){
+    private synchronized void checkPool(){
         if(count<poolConfig.getMaxPoolSize())
         {
             while (freeConnection.size()<poolConfig.getMinPoolSize())
@@ -81,7 +82,7 @@ public class ConnectionPool {
     }
 
     //清空数据库连接池
-    public void destroy()
+    public synchronized void destroy()
     {
         scheduledExecutorService.shutdown();
         for(Connection connection:freeConnection)
@@ -127,20 +128,15 @@ public class ConnectionPool {
             }
             else {
                 count--;
+                System.out.println(thread.getName()+"的连接不可用了，重新获取");
                 connection=getConnection();
             }
         }
         else {
             try {
-                if (count < poolConfig.getMaxPoolSize()) {
-                    if (freeConnection.size() > 0) {
-                        connection=freeConnection.remove(0);
-                    }else
-                    {
-                        connection=getNewConnetion();
-                        count++;
-                        System.out.println("创建了一条全新的连接");
-                    }
+                if(freeConnection.size() > 0)
+                {
+                    connection=freeConnection.remove(0);
                     if(isEnable(connection))
                     {
                         useConnection.add(connection);
@@ -151,10 +147,36 @@ public class ConnectionPool {
                         connection=getConnection();
                     }
                 }
-                else {
-                    wait(poolConfig.getMaxWaitTime());
-                    connection=getConnection();
+                else{
+                    if(count<poolConfig.getMaxPoolSize())
+                    {
+                        connection=getNewConnetion();
+                        count++;
+                        System.out.println("创建了一条全新的连接");
+                        if(isEnable(connection))
+                        {
+                            useConnection.add(connection);
+                            System.out.println(thread.getName()+"创建了一条全新的连接，还剩"+freeConnection.size()+"条空闲连接,和"+useConnection.size()+"条正使用连接");
+                        }
+                        else {
+                            count--;
+                            connection=getConnection();
+                        }
+                    }
+                    else {
+                        wait(poolConfig.getMaxWaitTime());
+                        connection=getConnection();
+                    }
                 }
+                /*if(isEnable(connection))
+                {
+                    useConnection.add(connection);
+                    System.out.println(thread.getName()+"拿走了池里的空闲连接，还剩"+freeConnection.size()+"条空闲连接,和"+useConnection.size()+"条正使用连接");
+                }
+                else {
+                    count--;
+                    connection=getConnection();
+                }*/
             }catch (SQLException e)
             {
                 e.printStackTrace();
@@ -185,7 +207,7 @@ public class ConnectionPool {
         Thread thread=Thread.currentThread();
         if(threadLocal.get()!=null) {
             if (isEnable(connection)) {
-                if (freeConnection.size() < poolConfig.getMaxPoolSize()) {
+                if (count <= poolConfig.getMaxPoolSize()) {
                     freeConnection.add(connection);
                 } else {
                     try {

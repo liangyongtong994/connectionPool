@@ -7,34 +7,55 @@ import java.sql.Connection;
 import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.sql.Statement;
+import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
 
 public class CPTest {
 
     public static void main(String[] args){
+        ExecutorService executorService = Executors.newFixedThreadPool(10);
 
         ConnectionPool connectionPool= DBUtils.getConnectionPoolInstance();
-        RunTest runTest1=new RunTest("Thread-1");
-        runTest1.start();
-        RunTest2 runTest21=new RunTest2("wrong-thread");
-        runTest21.start();
-        RunTest runTest2=new RunTest("Thread-2");
-        runTest2.start();
-        RunTest runTest3=new RunTest("Thread-3");
-        runTest3.start();
-        RunTest runTest4=new RunTest("Thread-4");
-        runTest4.start();
-        RunTest runTest5=new RunTest("Thread-5");
-        runTest5.start();
-        try {
-            Thread.sleep(8000);
-        } catch (InterruptedException e) {
-            e.printStackTrace();
+        long startTime=System.currentTimeMillis();
+        for (int i=0;i<1000;i++)
+        {
+            executorService.execute(new Runnable() {
+                @Override
+                public void run() {
+                    String sql="select * from task";
+                    Connection connection=null;
+                    try {
+                        connection=connectionPool.getConnection();
+                        Statement statement=connection.createStatement();
+                        ResultSet resultSet=statement.executeQuery(sql);
+                        while (resultSet.next()){
+                            String taskname=resultSet.getNString("task_name");
+                            System.out.println("taskname:"+taskname);
+                        }
+                        //Thread.sleep(2000);
+                        resultSet.close();
+                        statement.close();
+                        connection.close();
+                    } catch (InterruptedException e) {
+                        e.printStackTrace();
+                    } catch (SQLException e) {
+                        e.printStackTrace();
+                    }
+                }
+            });
         }
+        executorService.shutdown();
+        while (!executorService.isTerminated()){
+
+        }
+        long endTime=System.currentTimeMillis();
+        System.out.println("程序运行时间： "+(endTime-startTime)+"ms");
         connectionPool.destroy();
     }
 }
 
-class RunTest implements Runnable{
+/*class RunTest implements Runnable{
 
     private Thread t;
     private String threadName;
@@ -54,11 +75,10 @@ class RunTest implements Runnable{
                 String taskname=resultSet.getNString("task_name");
                 System.out.println("taskname:"+taskname);
             }
-            Thread.sleep(3000);
+            //Thread.sleep(2000);
             resultSet.close();
             statement.close();
             connection.close();
-            //connectionPool.releaseConnection(connection);
         } catch (InterruptedException e) {
             e.printStackTrace();
         } catch (SQLException e) {
@@ -72,7 +92,7 @@ class RunTest implements Runnable{
             t.start ();
         }
     }
-}
+}*/
 
 class RunTest2 implements Runnable{
 
@@ -89,9 +109,7 @@ class RunTest2 implements Runnable{
 
             String sql="select * from task";
             connection=connectionPool.getConnection();
-            //Connection connection1=connectionPool.getConnection();
             throw new SQLException("连接失败");
-            //connection1.close();
             //connection.close();
 
 

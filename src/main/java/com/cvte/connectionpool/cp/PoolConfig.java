@@ -12,13 +12,23 @@ public class PoolConfig {
     //密码
     private String password;
     //最小空闲连接数
-    private int minPoolSize=2;
+    private int minPoolSize=3;
     //初始化连接数
-    private int initialPoolSize=3;
+    private int initialPoolSize=5;
     //最大连接数
-    private int maxPoolSize=7;
+    private int maxPoolSize=10;
     //最大等待时间
-    private int maxWaitTime=2000;
+    private int maxWaitTime=1000;
+
+    private int checkTime=1;
+
+    public int getCheckTime() {
+        return checkTime;
+    }
+
+    public void setCheckTime(int checkTime) {
+        this.checkTime = checkTime;
+    }
 
     public String getDriverName() {
         return driverName;
