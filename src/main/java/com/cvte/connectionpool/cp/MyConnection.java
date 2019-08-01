@@ -58,6 +58,7 @@ public class MyConnection implements Connection {
         this.connection.rollback();
     }
 
+    //重写close方法使其调用连接池的释放方法
     @Override
     public void close() throws SQLException {
         this.connectionPool.releaseConnection(this);

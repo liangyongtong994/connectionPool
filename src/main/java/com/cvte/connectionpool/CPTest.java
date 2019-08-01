@@ -15,10 +15,12 @@ public class CPTest {
 
     public static void main(String[] args){
         ExecutorService executorService = Executors.newFixedThreadPool(10);
-
-        ConnectionPool connectionPool= DBUtils.getConnectionPoolInstance();
+        //ConnectionPool connectionPool= DBUtils.getConnectionPoolInstance();
+        DBUtils dbUtils=DBUtils.getDbUtils();
         long startTime=System.currentTimeMillis();
-        for (int i=0;i<1000;i++)
+        RunTest2 runTest2=new RunTest2("wrong-thread");
+        runTest2.start();
+        for (int i=0;i<10;i++)
         {
             executorService.execute(new Runnable() {
                 @Override
@@ -26,7 +28,8 @@ public class CPTest {
                     String sql="select * from task";
                     Connection connection=null;
                     try {
-                        connection=connectionPool.getConnection();
+                        //connection=connectionPool.getConnection();
+                        connection=dbUtils.getConnection();
                         Statement statement=connection.createStatement();
                         ResultSet resultSet=statement.executeQuery(sql);
                         while (resultSet.next()){
@@ -37,9 +40,7 @@ public class CPTest {
                         resultSet.close();
                         statement.close();
                         connection.close();
-                    } catch (InterruptedException e) {
-                        e.printStackTrace();
-                    } catch (SQLException e) {
+                    }  catch (SQLException e) {
                         e.printStackTrace();
                     }
                 }
@@ -51,7 +52,7 @@ public class CPTest {
         }
         long endTime=System.currentTimeMillis();
         System.out.println("程序运行时间： "+(endTime-startTime)+"ms");
-        connectionPool.destroy();
+        dbUtils.destroyPool();
     }
 }
 
@@ -103,21 +104,24 @@ class RunTest2 implements Runnable{
     }
     @Override
     public void run() {
-        ConnectionPool connectionPool= DBUtils.getConnectionPoolInstance();
+        //ConnectionPool connectionPool= DBUtils.getConnectionPoolInstance();
+        DBUtils dbUtils=DBUtils.getDbUtils();
         Connection connection=null;
         try {
 
             String sql="select * from task";
-            connection=connectionPool.getConnection();
+            //connection=connectionPool.getConnection();
+            connection=dbUtils.getConnection();
+            Thread.sleep(2000);
             throw new SQLException("连接失败");
             //connection.close();
 
 
-        } catch (InterruptedException e) {
-            e.printStackTrace();
         } catch (SQLException e) {
             e.printStackTrace();
-        }finally {
+        } catch (InterruptedException e) {
+            e.printStackTrace();
+        } finally {
             if(connection!=null) {
                 try {
                     connection.close();

@@ -44,7 +44,7 @@ public class DBUtils {
 
     private DBUtils(){};
     //双重校验锁单例对象
-    private volatile static ConnectionPool connectionPool;
+    /*private volatile static ConnectionPool connectionPool;
     public static ConnectionPool getConnectionPoolInstance(){
         if(connectionPool==null){
             synchronized (ConnectionPool.class){
@@ -55,9 +55,24 @@ public class DBUtils {
             }
         }
         return connectionPool;
+    }*/
+    private ConnectionPool connectionPool=new ConnectionPool(poolConfig);
+
+    private volatile static DBUtils dbUtils;
+
+    public static DBUtils getDbUtils(){
+        if(dbUtils==null){
+            synchronized (DBUtils.class){
+                if(dbUtils==null){
+                    System.out.println("对象创建成功了");
+                    dbUtils=new DBUtils();
+                }
+            }
+        }
+        return dbUtils;
     }
 
-    public static Connection getConnection(){
+    public Connection getConnection(){
         try {
             return connectionPool.getConnection();
         } catch (InterruptedException e) {
@@ -66,7 +81,7 @@ public class DBUtils {
         return null;
     }
 
-    public static void destroyPool()
+    public void destroyPool()
     {
         connectionPool.destroy();
     }
