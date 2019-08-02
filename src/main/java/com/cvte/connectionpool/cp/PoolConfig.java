@@ -3,6 +3,7 @@ package com.cvte.connectionpool.cp;
 //数据库连接池相关配置类
 public class PoolConfig {
 
+    private String dbSource;
     //驱动类名
     private String driverName;
     //jdbcurl
@@ -20,7 +21,15 @@ public class PoolConfig {
     //最大等待时间
     private int maxWaitTime=1000;
 
-    private int checkTime=1;
+    private int checkTime=1000;
+
+    public String getDbSource() {
+        return dbSource;
+    }
+
+    public void setDbSource(String dbSource) {
+        this.dbSource = dbSource;
+    }
 
     public int getCheckTime() {
         return checkTime;

@@ -3,17 +3,47 @@ package com.cvte.connectionpool.cp;
 import java.io.IOException;
 import java.sql.Connection;
 import java.util.Properties;
+import java.util.concurrent.ConcurrentHashMap;
 
 public class DBUtils {
 
-    private static PoolConfig poolConfig=new PoolConfig();
+    //private static PoolConfig poolConfig=new PoolConfig();
+    private  ConcurrentHashMap<String,ConnectionPool> connectionPools=new ConcurrentHashMap<>();
 
     //配置数据库连接信息等
-    static {
+    private void createPools() {
         Properties properties=new Properties();
         try {
             properties.load(DBUtils.class.getClassLoader().getResourceAsStream("dbpool.properties"));
-            poolConfig.setDriverName(properties.getProperty("jdbc.driverName"));
+            String dbSource=properties.getProperty("dbSource");
+            for(String db:dbSource.split(","))
+            {
+                PoolConfig poolConfig=new PoolConfig();
+                poolConfig.setDbSource(db);
+                poolConfig.setDriverName(properties.getProperty(db+".driverName"));
+                poolConfig.setUrl(properties.getProperty(db+".url"));
+                poolConfig.setUserName(properties.getProperty(db+".userName"));
+                poolConfig.setPassword(properties.getProperty(db+".password"));
+                if(properties.getProperty(db+".minPoolSize")!=null)
+                {
+                    poolConfig.setMinPoolSize(Integer.parseInt(properties.getProperty(db+".minPoolSize")));
+                }
+                if(properties.getProperty(db+".initialPoolSize")!=null)
+                {
+                    poolConfig.setInitialPoolSize(Integer.parseInt(properties.getProperty(db+".initialPoolSize")));
+                }
+                if(properties.getProperty(db+".maxPoolSize")!=null)
+                {
+                    poolConfig.setMaxPoolSize(Integer.parseInt(properties.getProperty(db+".maxPoolSize")));
+                }
+                if(properties.getProperty(db+".maxWaitTime")!=null)
+                {
+                    poolConfig.setMaxWaitTime(Integer.parseInt(properties.getProperty(db+".maxWaitTime")));
+                }
+                ConnectionPool connectionPool=new ConnectionPool(poolConfig);
+                connectionPools.put(db,connectionPool);
+            }
+            /*poolConfig.setDriverName(properties.getProperty("jdbc.driverName"));
             poolConfig.setUrl(properties.getProperty("jdbc.url"));
             poolConfig.setUserName(properties.getProperty("jdbc.userName"));
             poolConfig.setPassword(properties.getProperty("jdbc.password"));
@@ -32,7 +62,7 @@ public class DBUtils {
             if(properties.getProperty("cp.maxWaitTime")!=null)
             {
                 poolConfig.setMaxWaitTime(Integer.parseInt(properties.getProperty("cp.maxWaitTime")));
-            }
+            }*/
             //Class.forName(poolConfig.getDriverName());
         }catch (IOException e)
         {
@@ -42,21 +72,11 @@ public class DBUtils {
        // }
     }
 
-    private DBUtils(){};
+    private DBUtils(){
+        createPools();
+    };
     //双重校验锁单例对象
-    /*private volatile static ConnectionPool connectionPool;
-    public static ConnectionPool getConnectionPoolInstance(){
-        if(connectionPool==null){
-            synchronized (ConnectionPool.class){
-                if(connectionPool==null){
-                    System.out.println("对象创建成功了");
-                    connectionPool=new ConnectionPool(poolConfig);
-                }
-            }
-        }
-        return connectionPool;
-    }*/
-    private ConnectionPool connectionPool=new ConnectionPool(poolConfig);
+    //private ConnectionPool connectionPool=new ConnectionPool(poolConfig);
 
     private volatile static DBUtils dbUtils;
 
@@ -72,8 +92,9 @@ public class DBUtils {
         return dbUtils;
     }
 
-    public Connection getConnection(){
+    public Connection getConnection(String poolName){
         try {
+            ConnectionPool connectionPool=connectionPools.get(poolName);
             return connectionPool.getConnection();
         } catch (InterruptedException e) {
             e.printStackTrace();
@@ -81,9 +102,10 @@ public class DBUtils {
         return null;
     }
 
-    public void destroyPool()
-    {
+    public void destroyPool(String poolName) throws InterruptedException {
+        ConnectionPool connectionPool=connectionPools.get(poolName);
         connectionPool.destroy();
+        connectionPools.remove(poolName);
     }
    /*private static ConnectionPool connectionPool=null;
    public static ConnectionPool getConnectionPoolInstance(){

@@ -18,12 +18,14 @@ public class ConnectionPool {
     private LinkedList<Connection> useConnection = new LinkedList<>();//用来存放正在使用的连接
     private static ThreadLocal<Connection> threadLocal = new ThreadLocal<>();//存放当前线程请求到的连接
     private ScheduledExecutorService scheduledExecutorService;
-    private boolean isClosed=true;
+    private boolean isClosed;
+    private boolean isGetting=false;
+    private boolean isClosing=false;
 
     //初始化创建数据库连接池
     public ConnectionPool(PoolConfig poolConfig){
         this.poolConfig=poolConfig;
-        System.out.println("开始创建数据库连接池");
+        System.out.println("开始创建数据库连接池"+poolConfig.getDbSource());
         init();
         isClosed=false;
         Runnable runnable = new Runnable() {
@@ -34,7 +36,7 @@ public class ConnectionPool {
         };
         scheduledExecutorService= Executors.newSingleThreadScheduledExecutor();
         //开启定时任务
-        scheduledExecutorService.scheduleAtFixedRate(runnable,poolConfig.getCheckTime(),poolConfig.getCheckTime(), TimeUnit.SECONDS);
+        scheduledExecutorService.scheduleAtFixedRate(runnable,poolConfig.getCheckTime(),poolConfig.getCheckTime(), TimeUnit.MILLISECONDS);
     }
 
     //检查数据库连接池中的空闲连接是否达到最小空闲连接数
@@ -56,7 +58,6 @@ public class ConnectionPool {
                 }
             }
         }
-
     }
 
     //创建一条新的连接
@@ -85,9 +86,26 @@ public class ConnectionPool {
     }
 
     //清空数据库连接池
-    public synchronized void destroy()
-    {
+    public synchronized void destroy() throws InterruptedException {
         scheduledExecutorService.shutdown();
+        isClosed=true;
+        while(isGetting)
+        {
+        }
+        long startTime=System.currentTimeMillis();
+        long nowTime;
+        while (useConnection.size()>0)
+        {
+            nowTime=System.currentTimeMillis();
+            if(nowTime-startTime>5000)
+            {
+                break;
+            }
+            wait(1000);
+        }
+        while(isClosing)
+        {
+        }
         for(Connection connection:freeConnection)
         {
             try {
@@ -98,18 +116,7 @@ public class ConnectionPool {
                 e.printStackTrace();
             }
         }
-        for(Connection connection:useConnection)
-        {
-            try {
-                ((MyConnection)connection).realClose();
-
-            }catch (SQLException e)
-            {
-                e.printStackTrace();
-            }
-        }
-        isClosed=true;
-        System.out.println("清空数据库连接池");
+        System.out.println("清空"+poolConfig.getDbSource()+"数据库连接池");
         freeConnection.clear();
         useConnection.clear();
         connectionCount =0;
@@ -119,7 +126,7 @@ public class ConnectionPool {
     public synchronized Connection getConnection() throws InterruptedException {
         Thread thread=Thread.currentThread();
         Connection connection=null;
-        if(isClosed==false) {
+        if(!isClosed) {
             if (threadLocal.get() != null) {
                 connection = threadLocal.get();
                 if (isEnable(connection)) {
@@ -128,16 +135,18 @@ public class ConnectionPool {
                 } else {
                     connectionCount--;
                     threadLocal.remove();
+                    useConnection.remove(connection);
                     System.out.println(thread.getName() + "的连接不可用了，重新获取");
                     connection = getConnection();
                 }
             } else {
                 try {
                     if (freeConnection.size() > 0) {
+                        isGetting=true;
                         connection = freeConnection.remove(0);
                         if (isEnable(connection)) {
                             useConnection.add(connection);
-                            System.out.println(thread.getName() + "拿走了池里的空闲连接，还剩" + freeConnection.size() + "条空闲连接,和" + useConnection.size() + "条正使用连接");
+                            System.out.println(thread.getName() + "拿走了"+poolConfig.getDbSource()+"池里的空闲连接，还剩" + freeConnection.size() + "条空闲连接,和" + useConnection.size() + "条正使用连接");
                         } else {
                             connectionCount--;
                             System.out.println("连接异常，重新获取");
@@ -161,18 +170,10 @@ public class ConnectionPool {
                             connection = getConnection();
                         }
                     }
-                /*if(isEnable(connection))
-                {
-                    useConnection.add(connection);
-                    System.out.println(thread.getName()+"拿走了池里的空闲连接，还剩"+freeConnection.size()+"条空闲连接,和"+useConnection.size()+"条正使用连接");
-                }
-                else {
-                    connectionCount--;
-                    connection=getConnection();
-                }*/
                 } catch (SQLException e) {
                     e.printStackTrace();
                 }
+                isGetting=false;
                 threadLocal.set(connection);
             }
         }else
@@ -204,8 +205,10 @@ public class ConnectionPool {
     //释放连接
     public synchronized void releaseConnection(Connection connection)
     {
+        System.out.println("开始关闭");
         Thread thread=Thread.currentThread();
         if(threadLocal.get()!=null) {
+            isClosing=true;
             if (isEnable(connection)) {
                 if (connectionCount <= poolConfig.getMaxPoolSize()) {
                     freeConnection.add(connection);
@@ -219,6 +222,7 @@ public class ConnectionPool {
             }
             useConnection.remove(connection);
             threadLocal.remove();
+            isClosing=false;
             System.out.println(thread.getName() + "连接用完了，放回空闲池，还剩" + freeConnection.size() + "条空闲连接,和" + useConnection.size() + "条正使用连接");
             notifyAll();
         }

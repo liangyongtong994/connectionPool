@@ -20,7 +20,7 @@ public class MyConnection implements Connection {
     }
 
     //真正关闭连接的函数
-    void realClose() throws SQLException{
+    public void realClose() throws SQLException{
         connection.close();
     }
     @Override

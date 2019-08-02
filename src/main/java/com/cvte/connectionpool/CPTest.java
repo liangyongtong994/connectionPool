@@ -2,6 +2,7 @@ package com.cvte.connectionpool;
 
 import com.cvte.connectionpool.cp.ConnectionPool;
 import com.cvte.connectionpool.cp.DBUtils;
+import com.cvte.connectionpool.cp.MyConnection;
 
 import java.sql.Connection;
 import java.sql.ResultSet;
@@ -13,13 +14,13 @@ import java.util.concurrent.Executors;
 
 public class CPTest {
 
-    public static void main(String[] args){
+    public static void main(String[] args) throws InterruptedException {
         ExecutorService executorService = Executors.newFixedThreadPool(10);
         //ConnectionPool connectionPool= DBUtils.getConnectionPoolInstance();
         DBUtils dbUtils=DBUtils.getDbUtils();
         long startTime=System.currentTimeMillis();
-        RunTest2 runTest2=new RunTest2("wrong-thread");
-        runTest2.start();
+        //RunTest2 runTest2=new RunTest2("wrong-thread");
+       // runTest2.start();
         for (int i=0;i<10;i++)
         {
             executorService.execute(new Runnable() {
@@ -29,14 +30,14 @@ public class CPTest {
                     Connection connection=null;
                     try {
                         //connection=connectionPool.getConnection();
-                        connection=dbUtils.getConnection();
+                        connection=dbUtils.getConnection("todo");
                         Statement statement=connection.createStatement();
                         ResultSet resultSet=statement.executeQuery(sql);
                         while (resultSet.next()){
                             String taskname=resultSet.getNString("task_name");
                             System.out.println("taskname:"+taskname);
                         }
-                        //Thread.sleep(2000);
+                        //Thread.sleep(10000);
                         resultSet.close();
                         statement.close();
                         connection.close();
@@ -46,13 +47,18 @@ public class CPTest {
                 }
             });
         }
+        dbUtils.destroyPool("todo");
         executorService.shutdown();
         while (!executorService.isTerminated()){
 
         }
         long endTime=System.currentTimeMillis();
         System.out.println("程序运行时间： "+(endTime-startTime)+"ms");
-        dbUtils.destroyPool();
+        /*try {
+            dbUtils.destroyPool("todo");
+        } catch (InterruptedException e) {
+            e.printStackTrace();
+        }*/
     }
 }
 
@@ -109,11 +115,25 @@ class RunTest2 implements Runnable{
         Connection connection=null;
         try {
 
-            String sql="select * from task";
+            String sql="select * from test";
             //connection=connectionPool.getConnection();
-            connection=dbUtils.getConnection();
+            connection=dbUtils.getConnection("test");
+            ((MyConnection)connection).realClose();
+            connection=dbUtils.getConnection("test");
+            Statement statement=connection.createStatement();
+            ResultSet resultSet=statement.executeQuery(sql);
+            while (resultSet.next()){
+                String taskname=resultSet.getNString("test_col");
+                System.out.println("test_col:"+taskname);
+            }
+            //Thread.sleep(2000);
+            resultSet.close();
+            statement.close();
+            connection.close();
             Thread.sleep(2000);
-            throw new SQLException("连接失败");
+            dbUtils.destroyPool("test");
+
+            //throw new SQLException("连接失败");
             //connection.close();
 
 
